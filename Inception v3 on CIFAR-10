@@ -1,0 +1,53 @@
+import torch
+import torchvision
+import torchvision.transforms as transforms
+
+# Load the CIFAR-10 dataset
+train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
+test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms.ToTensor())
+
+# Define the Inception v3 model
+inceptionv3 = torchvision.models.inception_v3(pretrained=True)
+
+# Freeze the pre-trained weights
+for param in inceptionv3.parameters():
+    param.requires_grad = False
+
+# Define the classification layer
+classifier = torch.nn.Sequential(
+    torch.nn.Linear(1024, 10),
+)
+
+# Add the classification layer to the Inception v3 model
+inceptionv3.fc = classifier
+
+# Define the loss function and optimizer
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(inceptionv3.parameters(), lr=0.001, momentum=0.9)
+
+# Train the model
+for epoch in range(10):
+    for i, (images, labels) in enumerate(train_loader):
+        # Forward pass
+        outputs = inceptionv3(images)
+        loss = criterion(outputs, labels)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if i % 100 == 0:
+            print(f'Epoch {epoch}/{10}, Loss: {loss.item()}')
+
+# Evaluate the model on the test set
+correct = 0
+total = 0
+with torch.no_grad():
+    for images, labels in test_loader:
+        outputs = inceptionv3(images)
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+print(f'Accuracy: {correct / total}')
