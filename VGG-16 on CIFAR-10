@@ -1,1 +1,59 @@
+import torch
+import torchvision
+import torchvision.transforms as transforms
 
+# Load the CIFAR-10 dataset
+train_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms.ToTensor())
+test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms.ToTensor())
+
+# Define the VGG-16 model
+vgg16 = torchvision.models.vgg16(pretrained=True)
+
+# Freeze the pre-trained weights
+for param in vgg16.parameters():
+    param.requires_grad = False
+
+# Define the classification layer
+classifier = torch.nn.Sequential(
+    torch.nn.Linear(512 * 7 * 7, 4096),
+    torch.nn.ReLU(),
+    torch.nn.Dropout(0.5),
+    torch.nn.Linear(4096, 4096),
+    torch.nn.ReLU(),
+    torch.nn.Dropout(0.5),
+    torch.nn.Linear(4096, 10),
+)
+
+# Add the classification layer to the VGG-16 model
+vgg16.classifier = classifier
+
+# Define the loss function and optimizer
+criterion = torch.nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(vgg16.parameters(), lr=0.001, momentum=0.9)
+
+# Train the model
+for epoch in range(10):
+    for i, (images, labels) in enumerate(train_loader):
+        # Forward pass
+        outputs = vgg16(images)
+        loss = criterion(outputs, labels)
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if i % 100 == 0:
+            print(f'Epoch {epoch}/{10}, Loss: {loss.item()}')
+
+# Evaluate the model on the test set
+correct = 0
+total = 0
+with torch.no_grad():
+    for images, labels in test_loader:
+        outputs = vgg16(images)
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+print(f'Accuracy: {correct / total}')
